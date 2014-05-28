@@ -4,22 +4,31 @@
 -}
 
 import System.IO				-- For handles
+import System.Environment		-- For getArgs
 import Network.Socket			-- For sockets
 import Control.Concurrent		-- For threads
 
 -- Global vars for configuration
 port 		= "1234"			-- Port to send / receive broadcasts
-destination = "10.0.0.255" 		-- Host to send on
-hostname	= "10.0.0.1"		-- Host to listen on
 packetSize	= 1024				-- Maximum size of UDP packets
+-- Note: Global config is hardcoded to ensure all clients can talk to eachother
 
 main :: IO ()
 main = do
-	-- Convert destination string to an address
-	(broadcast:_) <- getAddrInfo Nothing (Just destination) (Just port)
-	(listen:_) <- getAddrInfo Nothing (Just hostname) (Just port)
-	forkIO (networkToClient listen)	-- Listen for incoming connections
-	clientToNetwork broadcast		-- Write to network
+	args <- getArgs
+	if length args == 3
+	then
+		do
+		let hostname = args !! 0		-- Host to listen on
+		let destination = args !! 1		-- Broadcast address to send to
+		let username = args !! 2		-- Username to send
+		-- Convert destination string to an address
+		(broadcast:_) <- getAddrInfo Nothing (Just destination) (Just port)
+		(listen:_) <- getAddrInfo Nothing (Just hostname) (Just port)
+		forkIO (networkToClient listen)			-- Read from network
+		clientToNetwork broadcast username		-- Write to network
+	else
+		putStrLn "Usage: MultiChat <Listen IP> <Broadcast address> <Username>"
 
 -- Returns a UDP socket connected to the broadcast address
 getBroadcastSock :: AddrInfo -> IO Socket
@@ -30,13 +39,13 @@ getBroadcastSock addr = do
 	return s
 
 -- Reads from the client and broadcasts messages to network
-clientToNetwork :: AddrInfo -> IO ()
-clientToNetwork addr = do
+clientToNetwork :: AddrInfo -> String -> IO ()
+clientToNetwork addr username = do
 	sock <- getBroadcastSock addr
 	msg <- getLine
-	send sock msg
+	send sock ("<" ++ username ++ "> " ++ msg)
 	close sock
-	clientToNetwork addr
+	clientToNetwork addr username
 
 -- Reads from network and prints messages to client
 networkToClient :: AddrInfo -> IO ()
