@@ -34,8 +34,8 @@ main = do
 getBroadcastSock :: AddrInfo -> IO Socket
 getBroadcastSock addr = do
 	s <- socket (addrFamily addr) Datagram defaultProtocol	-- Make new socket
-	setSocketOption s Broadcast 1							-- Enable broadcasting
-	connect s (addrAddress addr)							-- Connect to broadcast
+	setSocketOption s Broadcast 1							-- Enable broadcast
+	connect s (addrAddress addr)							-- Connect broadcast
 	return s
 
 -- Reads from the client and broadcasts messages to network
@@ -51,10 +51,18 @@ clientToNetwork addr username = do
 networkToClient :: AddrInfo -> IO ()
 networkToClient addr = do
 	let portno = (read port :: Integer) -- Make port an Integer
-	s <- socket (addrFamily addr) Datagram defaultProtocol	-- Make new socket
+	s <- socket (addrFamily addr) Datagram defaultProtocol	-- Make socket
 	bindSocket s (SockAddrInet (fromIntegral portno) iNADDR_ANY)
 	listenLoop s
 	where listenLoop sock = do
 		(msg, _, addr) <- recvFrom sock packetSize -- Read a packet from network
-		putStrLn msg
+		putStrLn ("[" ++ (getSockAddr addr) ++ "] " ++ msg)
 		listenLoop sock
+
+-- Gets the IP a socket is connected to
+getSockAddr :: SockAddr -> String
+getSockAddr addr = splitComma (show addr)
+	where splitComma (x:xs)
+		| (length xs == 0) = ""
+		| ([x] == ":") = ""
+		| otherwise = [x] ++ (splitComma xs)
